@@ -107,8 +107,8 @@ def filter_unseen_movies(movies_genres, movies_watched):
 
 def user_prefs(movies_watched, movies_aspects, users, aspect_type):
 	movies_aspects = filter_unseen_movies(movies_aspects, movies_watched)
-	movies_aspects = pd.DataFrame.from_dict(movies_aspects, dtype='int64', orient='index')
-	movies_aspects = movies_aspects.replace(np.nan, 0)
+	movies_aspects = pd.DataFrame.from_dict(movies_aspects, orient='index')
+	movies_aspects = movies_aspects.replace(np.nan, 0).astype('int64')
 	return users_movie_aspect_preferences(movies_aspects, movies_watched, users) 
 
 
@@ -318,16 +318,16 @@ if __name__ == "__main__":
 	print ('NR USERS %d' % len(sample_users))
 
 	movies_genres = dict_movie_aspect(films, "genre")
-	movies_genres = pd.DataFrame.from_dict(movies_genres, dtype='int64', orient='index').T
-	movies_genres = movies_genres.replace(np.nan, 0)
+	movies_genres = pd.DataFrame.from_dict(movies_genres, orient='index').T
+	movies_genres = movies_genres.replace(np.nan, 0).astype('int64')
 
 	movies_directors = dict_movie_aspect(films, "director")
-	movies_directors = pd.DataFrame.from_dict(movies_directors, dtype='int64', orient='index').T
-	movies_directors = movies_directors.replace(np.nan, 0)
+	movies_directors = pd.DataFrame.from_dict(movies_directors, orient='index').T
+	movies_directors = movies_directors.replace(np.nan, 0).astype('int64')
 
 	movies_actors = dict_movie_aspect(films, "actors")
-	movies_actors = pd.DataFrame.from_dict(movies_actors, dtype='int64', orient='index').T
-	movies_actors = movies_actors.replace(np.nan, 0)
+	movies_actors = pd.DataFrame.from_dict(movies_actors, orient='index').T
+	movies_actors = movies_actors.replace(np.nan, 0).astype('int64')
 
 	movies_watched = viewed_matrix(train_ratings_dict, films)
 

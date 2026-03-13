@@ -67,8 +67,8 @@ def viewed_matrix(ratings_cold_start, all_films, data_origin):
 
 def get_movies_aspect_matrix(films, aspect_type):
 	aspects_associated_to_movies = dict_movie_aspect(films, aspect_type)
-	movies_all_aspects_matrix = pd.DataFrame.from_dict(aspects_associated_to_movies, dtype='int64', orient='index')
-	movies_all_aspects_matrix = movies_all_aspects_matrix.replace(np.nan, 0)
+	movies_all_aspects_matrix = pd.DataFrame.from_dict(aspects_associated_to_movies, orient='index')
+	movies_all_aspects_matrix = movies_all_aspects_matrix.replace(np.nan, 0).astype('int64')
 	aspects_in_db = movies_all_aspects_matrix.keys()
 	print('We have %d %s (an example is %s)' % (len(aspects_in_db), aspect_type, aspects_in_db[0]))
 	return aspects_in_db, movies_all_aspects_matrix
@@ -123,8 +123,8 @@ def preprocessing(ratings, films, data_origin):
 
 	# compute similarity
 	movies_watched = viewed_matrix(train_ratings_dict, films, data_origin)
-	movies_watched = pd.DataFrame.from_dict(movies_watched, dtype='int64', orient='index').T
-	movies_watched = movies_watched.replace(np.nan, 0)
+	movies_watched = pd.DataFrame.from_dict(movies_watched, orient='index').T
+	movies_watched = movies_watched.replace(np.nan, 0).astype('int64')
 
 	user_ids_in_matrix = movies_watched.index.values
 	

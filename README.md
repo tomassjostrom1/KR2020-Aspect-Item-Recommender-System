@@ -47,6 +47,22 @@ Each entry in the `films` dictionary is in the following format:
 }
 ```
 
+## Getting started
+
+Install the Python dependencies:
+
+```bash
+python -m venv venv
+```
+
+```bash
+source venv/bin/activate
+```
+
+```bash
+pip install -r requirements.txt
+```
+
 ## Experiments
 
 How to run the scripts for the 2 sources (movielens and netflix):
