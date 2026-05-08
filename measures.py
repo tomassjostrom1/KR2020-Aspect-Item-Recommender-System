@@ -2,8 +2,11 @@
 
 
 import jsonlines
+import compute_strength
 from math import sqrt
 from compute_strength import film_strength
+from compute_strength import film_strength_with_graph
+from compute_strength import film_strength_with_graph_general
 from sklearn.metrics import mean_squared_error
 from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import precision_score
@@ -11,35 +14,90 @@ from sklearn.metrics import recall_score
 from sklearn.metrics import f1_score
 
 
-def predictions(MUR, MUG, MUA, MUD, films, compressed_test_ratings_dict, ratings_dict, sims, movies_all_genres_matrix, movies_all_directors_matrix, movies_all_actors_matrix, data_origin):
+def predictions_general(MUR, films, compressed_test_ratings_dict, ratings_dict, sims, aspects,aspect_weights, data_origin, nSimUsers):
 	# compute strengths
 	predictions = []
-	for user_id, true_ratings in compressed_test_ratings_dict.items():
+	graph={}
+	ii=0    #added *********
+	for user_id, true_ratings in compressed_test_ratings_dict.items():     #added [-1]
+		print("Running:" + user_id)
 		if true_ratings:
 			for (film_id, str_rating) in true_ratings:
-				strength = film_strength(MUR, MUG, MUA, MUD, user_id, film_id, films, ratings_dict, sims[user_id], movies_all_genres_matrix, movies_all_directors_matrix, movies_all_actors_matrix)
+				#strength = film_strength(MUR, MUG, MUA, MUD, user_id, film_id, films, ratings_dict, sims[user_id], movies_all_genres_matrix, movies_all_directors_matrix, movies_all_actors_matrix)
+				#strength, graph[(user_id,film_id)] = film_strength_with_graph(MUR, MUG, MUA, MUD, user_id, film_id, films, ratings_dict, sims[user_id], movies_all_genres_matrix, movies_all_directors_matrix, movies_all_actors_matrix)		
+				strength, graph[(user_id,film_id)] = film_strength_with_graph_general(MUR, user_id, film_id, films, ratings_dict, sims[user_id], aspects, aspect_weights ,nSimUsers)
+                
+
 				if data_origin == 'netflix':
 					predictions.append((int(str_rating), strength))
 				elif data_origin == 'small':
 					predictions.append((float(str_rating), strength))
 				elif data_origin == '100k':
 					predictions.append((int(str_rating), strength))
-
+		if(ii>2):     #Added **********  
+			break     #Added **********
+		else:         #Added **********
+			ii=ii+1         #Added **********
+    
 	if data_origin == 'netflix':
 		true_ratings = [x for (x,y) in predictions]
 		predicted_ratings = [round(y) for (x,y) in predictions]
 		p, r, f = binary_predictions(true_ratings, predicted_ratings)
-		return len(predictions), arg_accuracy_int(predictions), sqrt(mean_squared_error(true_ratings, predicted_ratings)), mean_absolute_error(true_ratings, predicted_ratings), p, r, f
+		return len(predictions), arg_accuracy_int(predictions), sqrt(mean_squared_error(true_ratings, predicted_ratings)), mean_absolute_error(true_ratings, predicted_ratings), p, r, f, graph
 	elif data_origin == 'small':
 		true_ratings = [x for (x,y) in predictions]
 		predicted_ratings = [round_of_rating(y) for (x,y) in predictions]
 		p, r, f = binary_predictions(true_ratings, predicted_ratings)
-		return len(predictions), arg_accuracy_float(predictions), sqrt(mean_squared_error(true_ratings, predicted_ratings)), mean_absolute_error(true_ratings, predicted_ratings), p ,r ,f
+		return len(predictions), arg_accuracy_float(predictions), sqrt(mean_squared_error(true_ratings, predicted_ratings)), mean_absolute_error(true_ratings, predicted_ratings), p ,r ,f, graph
 	elif data_origin == '100k':
 		true_ratings = [x for (x,y) in predictions]
 		predicted_ratings = [round(y) for (x,y) in predictions]
 		p, r, f = binary_predictions(true_ratings, predicted_ratings)
-		return len(predictions), arg_accuracy_int(predictions), sqrt(mean_squared_error(true_ratings, predicted_ratings)), mean_absolute_error(true_ratings, predicted_ratings), p ,r ,f
+		return len(predictions), arg_accuracy_int(predictions), sqrt(mean_squared_error(true_ratings, predicted_ratings)), mean_absolute_error(true_ratings, predicted_ratings), p ,r ,f, graph
+
+
+
+def predictions(MUR, MUG, MUA, MUD, films, compressed_test_ratings_dict, ratings_dict, sims, movies_all_genres_matrix, movies_all_directors_matrix, movies_all_actors_matrix, data_origin):
+	# compute strengths
+	predictions = []
+	graph={}
+	ii=0    #added *********
+	for user_id, true_ratings in compressed_test_ratings_dict.items():     #added [-1]
+		print("Running:" + user_id)
+		if true_ratings:
+			for (film_id, str_rating) in true_ratings:
+				#strength = film_strength(MUR, MUG, MUA, MUD, user_id, film_id, films, ratings_dict, sims[user_id], movies_all_genres_matrix, movies_all_directors_matrix, movies_all_actors_matrix)
+				#strength, graph[(user_id,film_id)] = film_strength_with_graph(MUR, MUG, MUA, MUD, user_id, film_id, films, ratings_dict, sims[user_id], movies_all_genres_matrix, movies_all_directors_matrix, movies_all_actors_matrix)
+				aspects = {"genre": (MUG, movies_all_genres_matrix), "actors": (MUA, movies_all_actors_matrix), "director": (MUD, movies_all_directors_matrix),}
+				strength, graph[(user_id,film_id)] = film_strength_with_graph_general(MUR, user_id, film_id, films, ratings_dict, sims[user_id], aspects)
+                
+
+				if data_origin == 'netflix':
+					predictions.append((int(str_rating), strength))
+				elif data_origin == 'small':
+					predictions.append((float(str_rating), strength))
+				elif data_origin == '100k':
+					predictions.append((int(str_rating), strength))
+		if(ii>2):     #Added **********  
+			break     #Added **********
+		else:         #Added **********
+			ii=ii+1         #Added **********
+    
+	if data_origin == 'netflix':
+		true_ratings = [x for (x,y) in predictions]
+		predicted_ratings = [round(y) for (x,y) in predictions]
+		p, r, f = binary_predictions(true_ratings, predicted_ratings)
+		return len(predictions), arg_accuracy_int(predictions), sqrt(mean_squared_error(true_ratings, predicted_ratings)), mean_absolute_error(true_ratings, predicted_ratings), p, r, f, graph
+	elif data_origin == 'small':
+		true_ratings = [x for (x,y) in predictions]
+		predicted_ratings = [round_of_rating(y) for (x,y) in predictions]
+		p, r, f = binary_predictions(true_ratings, predicted_ratings)
+		return len(predictions), arg_accuracy_float(predictions), sqrt(mean_squared_error(true_ratings, predicted_ratings)), mean_absolute_error(true_ratings, predicted_ratings), p ,r ,f, graph
+	elif data_origin == '100k':
+		true_ratings = [x for (x,y) in predictions]
+		predicted_ratings = [round(y) for (x,y) in predictions]
+		p, r, f = binary_predictions(true_ratings, predicted_ratings)
+		return len(predictions), arg_accuracy_int(predictions), sqrt(mean_squared_error(true_ratings, predicted_ratings)), mean_absolute_error(true_ratings, predicted_ratings), p ,r ,f, graph
 
 
 def binary_predictions(true_ratings, predicted_ratings):

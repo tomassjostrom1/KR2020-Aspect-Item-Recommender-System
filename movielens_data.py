@@ -21,7 +21,7 @@ if __name__ == "__main__":
     elif movielens_data == '100k':
         ratings = pickle.load(open("data/MOVIELENS/ml-100k/100k_benchmark_ratings.pkl","rb"))
         films = pickle.load(open("data/MOVIELENS/ml-100k/100k_benchmark_films_movielens.pkl","rb"))
-
+    
 
     # remove from ratings the missing films (that were missing info and hence were discarded)
     ids_to_del_rf = set(ratings.keys()).difference(set(films.keys()))

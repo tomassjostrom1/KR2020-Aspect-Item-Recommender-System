@@ -2,6 +2,454 @@
 
 
 import operator
+from BipolarGraph import BipolarGraph
+import sys
+
+
+
+def film_strength_with_graph_general(MUR, user_id, film_id, films, ratings, similarities_for_user,aspects ,aspect_weights, nSimUsers =20):
+                                     
+        
+	graph = BipolarGraph()
+
+
+    
+	#nSimUsers = 20 # number of similar users to use
+	simsSorted = sorted(similarities_for_user, key = operator.itemgetter(1), reverse = True)
+	sims = simsSorted[:nSimUsers]
+	film = films[film_id]
+   	
+	#for sim in sims:
+	#	graph.add_node(sim[0])	
+        
+	#graph.add_node("simGenger")
+	#graph.add_node("simActor")
+	#graph.add_node("simdirector")
+
+	#graph.add_node("dGenre")
+	#graph.add_node("simsGenre")
+	#graph.add_node("dActor")
+	#graph.add_node("simsActor")
+	#graph.add_node("dDirector")
+	#graph.add_node("simsDirector")
+
+	filmStrength="***Film strength***"
+
+	graph.add_node(filmStrength)
+    
+	#graph.add_node(avgGenreRatingNode)
+	#graph.add_node(avgActorRatingNode)
+	#graph.add_node(avgDirectorRatingNode)
+
+	
+	#	graph.add_edge("simsGenre","avgGenreRating")  #Added ***
+
+	#graph.add_edge("dActor","avgActorRating")  #Added ***
+	#graph.add_edge("simsActor","avgActorRating")  #Added ***
+
+	#graph.add_edge("dDirector","avgDirectorRating")  #Added ***
+	#graph.add_edge("simsDirector","avgDirectorRating")  #Added ***
+
+	
+
+	#graph.add_edge(avgGenreRatingNode,filmStrength)  #Added ***
+	#graph.add_edge(avgActorRatingNode,filmStrength)  #Added ***
+	#graph.add_edge(avgDirectorRatingNode,filmStrength)  #Added ***
+
+
+
+	aspect_rating = {}
+	#for aspect_name, (weight, movie_aspect) in aspects.items():
+	for aspect_name, movie_aspect in aspects.items():
+		weight = aspect_weights[aspect_name]
+	# take an average of each of the the genre's average ratings		
+
+		avgGenreRatingNode="Average " + aspect_name + "Rating"
+		graph.add_node(avgGenreRatingNode)
+		graph.add_edge(avgGenreRatingNode,filmStrength)  #Added ***
+        
+		nGenres = 0
+		dGenres = 0
+		if type(film[aspect_name]) is str:
+			film[aspect_name] = [film[aspect_name]]
+		for genre in film[aspect_name]:
+			aspect_value =  movie_aspect[genre].to_dict()
+			movie_ids_with_aspect_value = [k.split("_")[0] for k,v in aspect_value.items() if v == 1]
+    		
+    		# get the average rating for each film of this genre and take an average of those from the user and similar users
+			nGenre = 0
+			dGenre = 0
+			nGenreSim = 0
+			dGenreSim = 0
+    
+			dGenerNode="User " + aspect_name + genre
+			simsGenreNode="Sim " + aspect_name + genre        
+			avGenreNode="Average " + aspect_name + genre
+    
+			graph.add_node(avGenreNode) # added **********
+			graph.add_edge(avGenreNode,avgGenreRatingNode)  #Added ***
+            
+			graph.add_node(dGenerNode) # added **********
+			graph.add_edge(dGenerNode,avGenreNode)  #Added ***
+    
+			graph.add_node(simsGenreNode) # added **********
+			graph.add_edge(simsGenreNode,avGenreNode)  #Added ***       
+    		
+            
+			for genrefilm in movie_ids_with_aspect_value:
+				if (genrefilm, user_id) in ratings.keys():
+					dGenre += ((ratings[(genrefilm, user_id)] - 1) / 2)-1   # adds this to the current user's ratings total for this genre
+					nGenre += 1         # and the count
+    
+					graph.add_node("  " + aspect_name +"Film userID:"+ user_id+" "+genrefilm,((ratings[(genrefilm, user_id)] - 1) / 2)-1)  #Added ***
+					graph.add_edge("  " + aspect_name +"Film userID:"+ user_id+" "+genrefilm,dGenerNode)  #Added ***
+                    
+				else:
+					avg_rat = average_rating(sims, genrefilm, ratings)
+					if avg_rat:
+						dGenreSim += MUR * avg_rat  # adds this average to the similar users' ratings total for this genre
+						nGenreSim += 1       # and the count                    
+						graph.add_node("  " + aspect_name +"sims: "+genrefilm, MUR * avg_rat)  #Added ***
+						graph.add_edge("  " + aspect_name +"sims: "+genrefilm, simsGenreNode)  #Added ***
+    
+            
+			graph.nodes[dGenerNode].set_weight(dGenre)      #Added ***
+			graph.nodes[simsGenreNode].set_weight(dGenreSim)      #Added ***
+        
+			if nGenre > 0:              # if we have films of this genre with ratings from the user
+				if nGenreSim > 0:        # and also films of this genre with ratings from similar users
+					avGenre = ((dGenre / nGenre) + (dGenreSim / nGenreSim)) / (1 + MUR)       # uses both the current user's and similar users' ratings	
+					graph.nodes[dGenerNode].set_weight(dGenre / nGenre)      #Added ***
+					graph.nodes[simsGenreNode].set_weight(dGenreSim/nGenreSim)      #Added ***
+				else:
+					avGenre = dGenre / nGenre       # uses only the current user's ratings
+					graph.nodes[dGenerNode].set_weight(dGenre / nGenre)      #Added ***
+            
+			else:                       # if we do not have films of this genre with ratings from the user
+				if nGenreSim > 0:        # but we have films of this genre with ratings from similar users
+					avGenre = dGenreSim / nGenreSim       # uses only the similar users' ratings
+					graph.nodes[simsGenreNode].set_weight(dGenreSim/nGenreSim)      #Added ***
+				else:
+					avGenre = 0
+    		
+			graph.nodes[avGenreNode].set_weight(avGenre)      #Added ***
+            
+			dGenres += avGenre
+			nGenres += 1
+    
+		if nGenres > 0:
+			avgGenreRating = dGenres / nGenres
+		else:
+			avgGenreRating = 0
+
+		aspect_rating[aspect_name] = avgGenreRating
+		graph.nodes[avgGenreRatingNode].set_weight(avgGenreRating)      #Added ***
+
+    
+	item_strength = 0
+	weight_sum=0
+	#for aspect_name, (weight, movie_aspect) in aspects.items():
+	for aspect_name, movie_aspect in aspects.items():
+		weight = aspect_weights[aspect_name]
+        
+		item_strength += weight*aspect_rating[aspect_name]
+		weight_sum += weight
+	item_strength = item_strength/weight_sum
+	# compute strength
+	#item_strength = ((MUG * avgGenreRating) + (MUA * avgActorRating)+ (MUD * avgDirectorRating)) / (MUG + MUA + MUD)
+	film_strength = (((item_strength + 1)*2)+1)
+
+	graph.nodes[filmStrength].set_weight(item_strength)      #Added ***   
+	return film_strength, graph
+
+
+
+
+
+
+
+def film_strength_with_graph(MUR, MUG, MUA, MUD, user_id, film_id, films, ratings, similarities_for_user, movies_genres, movies_directors, movies_actors):
+	graph = BipolarGraph()
+
+
+    
+	nSimUsers = 20 # number of similar users to use
+	simsSorted = sorted(similarities_for_user, key = operator.itemgetter(1), reverse = True)
+	sims = simsSorted[:nSimUsers]
+	film = films[film_id]
+   	
+	#for sim in sims:
+	#	graph.add_node(sim[0])	
+        
+	#graph.add_node("simGenger")
+	#graph.add_node("simActor")
+	#graph.add_node("simdirector")
+
+	#graph.add_node("dGenre")
+	#graph.add_node("simsGenre")
+	#graph.add_node("dActor")
+	#graph.add_node("simsActor")
+	#graph.add_node("dDirector")
+	#graph.add_node("simsDirector")
+
+	avgGenreRatingNode="Average GenreRating"
+	avgActorRatingNode="Average ActorRating"
+	avgDirectorRatingNode="Average DirectorRating"
+	filmStrength="***Film strength***"
+
+	graph.add_node(filmStrength)
+    
+	graph.add_node(avgGenreRatingNode)
+	graph.add_node(avgActorRatingNode)
+	graph.add_node(avgDirectorRatingNode)
+
+	
+	#	graph.add_edge("simsGenre","avgGenreRating")  #Added ***
+
+	#graph.add_edge("dActor","avgActorRating")  #Added ***
+	#graph.add_edge("simsActor","avgActorRating")  #Added ***
+
+	#graph.add_edge("dDirector","avgDirectorRating")  #Added ***
+	#graph.add_edge("simsDirector","avgDirectorRating")  #Added ***
+
+	
+
+	graph.add_edge(avgGenreRatingNode,filmStrength)  #Added ***
+	graph.add_edge(avgActorRatingNode,filmStrength)  #Added ***
+	graph.add_edge(avgDirectorRatingNode,filmStrength)  #Added ***
+  
+	# take an average of each of the the genre's average ratings
+	nGenres = 0
+	dGenres = 0
+	if type(film['genre']) is str:
+		film['genre'] = [film['genre']]
+	for genre in film['genre']:
+		aspect_value =  movies_genres[genre].to_dict()
+		movie_ids_with_aspect_value = [k.split("_")[0] for k,v in aspect_value.items() if v == 1]
+		
+		# get the average rating for each film of this genre and take an average of those from the user and similar users
+		nGenre = 0
+		dGenre = 0
+		nGenreSim = 0
+		dGenreSim = 0
+
+		dGenerNode="User Genre: " + genre
+		simsGenreNode="Sim Genre: " + genre        
+		avGenreNode="Average Genre: " + genre
+
+		graph.add_node(avGenreNode) # added **********
+		graph.add_edge(avGenreNode,avgGenreRatingNode)  #Added ***
+        
+		graph.add_node(dGenerNode) # added **********
+		graph.add_edge(dGenerNode,avGenreNode)  #Added ***
+
+		graph.add_node(simsGenreNode) # added **********
+		graph.add_edge(simsGenreNode,avGenreNode)  #Added ***       
+		
+        
+		for genrefilm in movie_ids_with_aspect_value:
+			if (genrefilm, user_id) in ratings.keys():
+				dGenre += ((ratings[(genrefilm, user_id)] - 1) / 2)-1   # adds this to the current user's ratings total for this genre
+				nGenre += 1         # and the count
+
+				graph.add_node("  GengerFilm userID:"+ user_id+" "+genrefilm,((ratings[(genrefilm, user_id)] - 1) / 2)-1)  #Added ***
+				graph.add_edge("  GengerFilm userID:"+ user_id+" "+genrefilm,dGenerNode)  #Added ***
+                
+			else:
+				avg_rat = average_rating(sims, genrefilm, ratings)
+				if avg_rat:
+					dGenreSim += MUR * avg_rat  # adds this average to the similar users' ratings total for this genre
+					nGenreSim += 1       # and the count                    
+					graph.add_node("  GengerFilm sims: "+genrefilm, MUR * avg_rat)  #Added ***
+					graph.add_edge("  GengerFilm sims: "+genrefilm, simsGenreNode)  #Added ***
+
+        
+		graph.nodes[dGenerNode].set_weight(dGenre)      #Added ***
+		graph.nodes[simsGenreNode].set_weight(dGenreSim)      #Added ***
+    
+		if nGenre > 0:              # if we have films of this genre with ratings from the user
+			if nGenreSim > 0:        # and also films of this genre with ratings from similar users
+				avGenre = ((dGenre / nGenre) + (dGenreSim / nGenreSim)) / (1 + MUR)       # uses both the current user's and similar users' ratings	
+				graph.nodes[dGenerNode].set_weight(dGenre / nGenre)      #Added ***
+				graph.nodes[simsGenreNode].set_weight(dGenreSim/nGenreSim)      #Added ***
+			else:
+				avGenre = dGenre / nGenre       # uses only the current user's ratings
+				graph.nodes[dGenerNode].set_weight(dGenre / nGenre)      #Added ***
+        
+		else:                       # if we do not have films of this genre with ratings from the user
+			if nGenreSim > 0:        # but we have films of this genre with ratings from similar users
+				avGenre = dGenreSim / nGenreSim       # uses only the similar users' ratings
+				graph.nodes[simsGenreNode].set_weight(dGenreSim/nGenreSim)      #Added ***
+			else:
+				avGenre = 0
+		
+		graph.nodes[avGenreNode].set_weight(avGenre)      #Added ***
+        
+		dGenres += avGenre
+		nGenres += 1
+
+	if nGenres > 0:
+		avgGenreRating = dGenres / nGenres
+	else:
+		avgGenreRating = 0
+
+	graph.nodes[avgGenreRatingNode].set_weight(avgGenreRating)      #Added ***
+
+	# take an average of each of the the actor's average ratings
+	nActors = 0
+	dActors = 0
+	if type(film['actors']) is str:
+		film['actors'] = [film['actors']]
+	for actor in film['actors']:
+		aspect_value =  movies_actors[actor].to_dict()
+		movie_ids_with_aspect_value = [k.split("_")[0] for k,v in aspect_value.items() if v == 1]
+
+		# get the average rating for each film of this actor and take an average of those from the user and similar users
+		nActor = 0
+		dActor = 0
+		nActorSim = 0
+		dActorSim = 0
+
+		dActorNode="User Actor: " + actor
+		simsActorNode="Sim Actor: " + actor
+		avActorNode="Average Actor: " + actor
+
+		graph.add_node(avActorNode) # added **********
+		graph.add_edge(avActorNode,avgActorRatingNode)  #Added ***
+    
+		graph.add_node(dActorNode) # added **********
+		graph.add_edge(dActorNode,avActorNode)  #Added ***
+
+		graph.add_node(simsActorNode) # added **********
+		graph.add_edge(simsActorNode,avActorNode)  #Added ***
+
+		for actorfilm in movie_ids_with_aspect_value:
+			if (actorfilm, user_id) in ratings.keys():
+				dActor += ((ratings[(actorfilm, user_id)] - 1) / 2)-1   # adds this to the current user's ratings total for this actor
+				nActor += 1         # and the count
+				graph.add_node("  Actorfilm userID:"+ user_id+" "+actorfilm, ((ratings[(actorfilm, user_id)] - 1) / 2)-1)  #Added ***
+				graph.add_edge("  Actorfilm userID:"+ user_id+" "+actorfilm,dActorNode)  #Added ***
+			else:
+				avg_rat = average_rating(sims, actorfilm, ratings)
+				if avg_rat:
+					dActorSim += MUR * avg_rat  # adds this average to the similar users' ratings total for this actor
+					nActorSim += 1       # and the count
+					graph.add_node("  Actorfilm sims: "+actorfilm, MUR * avg_rat)  #Added ***
+					graph.add_edge("  Actorfilm sims: "+actorfilm, simsActorNode)  #Added ***
+
+		graph.nodes[dActorNode].set_weight(dActor)      #Added ***
+		graph.nodes[simsActorNode].set_weight(dActorSim)      #Added ***
+        
+		if nActor > 0:              # if we have films of this actor with ratings from the user
+			if nActorSim > 0:        # and also films of this actor with ratings from similar users
+				avActor = ((dActor / nActor) + (dActorSim / nActorSim)) / (1 + MUR)       # uses both the current user's and similar users' ratings 
+				graph.nodes[dActorNode].set_weight(dActor / nActor)      #Added ***
+				graph.nodes[simsActorNode].set_weight(dActorSim / nActorSim)      #Added ***
+			else:
+				avActor = dActor / nActor       # uses only the current user's ratings
+				graph.nodes[dActorNode].set_weight(dActor / nActor)      #Added ***
+		else:                       # if we do not have films of this actor with ratings from the user
+			if nActorSim > 0:        # but we have films of this actor with ratings from similar users
+				avActor = dActorSim / nActorSim       # uses only the similar users' ratings
+				graph.nodes[simsActorNode].set_weight(dActorSim / nActorSim)      #Added ***
+			else:
+				avActor = 0
+
+		graph.nodes[avActorNode].set_weight(avActor)      #Added ***
+
+		dActors += avActor
+		nActors += 1
+
+	if nActors > 0:
+		avgActorRating = dActors / nActors
+	else:
+		avgActorRating = 0
+
+	graph.nodes[avgActorRatingNode].set_weight(avgActorRating)      #Added ***        
+
+	# take an average of each of the the director's average ratings
+	nDirectors = 0
+	dDirectors = 0
+	if type(film['director']) is str:
+		film['director'] = [film['director']]
+	for director in film['director']:
+		aspect_value =  movies_directors[director].to_dict()
+		movie_ids_with_aspect_value = [k.split("_")[0] for k,v in aspect_value.items() if v == 1]
+
+		# get the average rating for each film of this director and take an average of those from the user and similar users
+		nDirector = 0
+		dDirector = 0
+		nDirectorSim = 0
+		dDirectorSim = 0
+
+		dDirectorNode="User Director: " + director
+		simsDirectorNode="Sim Director: " + director
+		avDirectorNode="Average Director: " + director
+
+		graph.add_node(avDirectorNode) # added **********
+		graph.add_edge(avDirectorNode,avgDirectorRatingNode)  #Added ***
+
+		graph.add_node(dDirectorNode) # added **********
+		graph.add_edge(dDirectorNode,avDirectorNode)  #Added ***
+
+		graph.add_node(simsDirectorNode) # added **********
+		graph.add_edge(simsDirectorNode,avDirectorNode)  #Added ***
+
+		for directorfilm in movie_ids_with_aspect_value:
+			if (directorfilm, user_id) in ratings.keys():
+				dDirector += ((ratings[(directorfilm, user_id)] - 1) / 2)-1   # adds this to the current user's ratings total for this director
+				nDirector += 1         # and the count
+				graph.add_node("  Directorfilm userID:"+ user_id+" "+directorfilm, ((ratings[(directorfilm, user_id)] - 1) / 2)-1)  #Added ***
+				graph.add_edge("  Directorfilm userID:"+ user_id+" "+directorfilm,dDirectorNode)  #Added ***
+			else:
+				avg_rat = average_rating(sims, directorfilm, ratings)
+				if avg_rat:
+					dDirectorSim += MUR * avg_rat  # adds this average to the similar users' ratings total for this Director
+					nDirectorSim += 1       # and the count
+					graph.add_node("  Directorfilm sims: "+directorfilm, MUR * avg_rat)  #Added ***
+					graph.add_edge("  Directorfilm sims: "+directorfilm, simsDirectorNode)  #Added ***
+
+		graph.nodes[dDirectorNode].set_weight(dDirector)      #Added ***
+		graph.nodes[simsDirectorNode].set_weight(dDirectorSim)      #Added ***
+        
+		if nDirector > 0:              # if we have films of this Director with ratings from the user
+			if nDirectorSim > 0:        # and also films of this Director with ratings from similar users
+				avDirector = ((dDirector / nDirector) + (dDirectorSim / nDirectorSim)) / (1 + MUR)       # uses both the current user's and similar users' ratings 
+				graph.nodes[dDirectorNode].set_weight(dDirector / nDirector)      #Added ***
+				graph.nodes[simsDirectorNode].set_weight(dDirectorSim / nDirectorSim)      #Added ***
+			else:
+				avDirector = dDirector / nDirector       # uses only the current user's ratings
+				graph.nodes[dDirectorNode].set_weight(dDirector / nDirector)      #Added ***				
+		else:                       # if we do not have films of this Director with ratings from the user
+			if nDirectorSim > 0:        # but we have films of this Director with ratings from similar users
+				avDirector = dDirectorSim / nDirectorSim       # uses only the similar users' ratings
+				graph.nodes[simsDirectorNode].set_weight(dDirectorSim / nDirectorSim)      #Added ***
+			else:
+				avDirector = 0
+
+		graph.nodes[avDirectorNode].set_weight(avDirector)      #Added ***
+		dDirectors += avDirector
+		nDirectors += 1
+
+		#graph.nodes[dDirectorNode].set_weight(dDirector)      #Added ***
+		#graph.nodes[simsDirectorNode].set_weight(dDirectorSim)      #Added ***
+
+	if nDirectors > 0:
+		avgDirectorRating = dDirectors / nDirectors
+	else:
+		avgDirectorRating = 0
+        
+	graph.nodes[avgDirectorRatingNode].set_weight(avgDirectorRating)      #Added ***            
+
+	# compute strength
+	item_strength = ((MUG * avgGenreRating) + (MUA * avgActorRating)+ (MUD * avgDirectorRating)) / (MUG + MUA + MUD)
+	film_strength = (((item_strength + 1)*2)+1)
+
+	graph.nodes[filmStrength].set_weight(film_strength)      #Added ***   
+	return film_strength, graph
+
+
+
 
 
 def film_strength(MUR, MUG, MUA, MUD, user_id, film_id, films, ratings, similarities_for_user, movies_genres, movies_directors, movies_actors):
@@ -9,7 +457,7 @@ def film_strength(MUR, MUG, MUA, MUD, user_id, film_id, films, ratings, similari
 	simsSorted = sorted(similarities_for_user, key = operator.itemgetter(1), reverse = True)
 	sims = simsSorted[:nSimUsers]
 	film = films[film_id]
-
+    
 	# take an average of each of the the genre's average ratings
 	nGenres = 0
 	dGenres = 0
